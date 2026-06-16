@@ -5,6 +5,7 @@ import 'package:dio_redirect_interceptor/dio_redirect_interceptor.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:tronclass/data/get_storage.dart';
+import 'package:tronclass/data/service/login.dart';
 import 'package:tronclass/data/service/tronclass.dart';
 import 'package:tronclass/http/proxy/setup_http_proxy.dart';
 import 'package:tronclass/path.dart';
@@ -92,6 +93,7 @@ class ChangkeClient {
         ),
       )..interceptors.addAll([
           CookieManager(instance._cookieJar),
+          RefererInterceptor(),
           RedirectInterceptor(() => instance.casDio),
         ]);
 
@@ -117,6 +119,8 @@ class ChangkeClient {
     required String password,
     required CaptchaRequester captchaRequester,
   }) async {
+    // 登录前清理过期的 CAS 会话 cookie，避免残留会话导致误报“密码错误”
+    await removeCasSessionCookies(_cookieJar);
     final session = await TronClassService.login(
       _casDio, // CAS 认证
       _dio, // 普通请求
@@ -140,6 +144,16 @@ class ChangkeClient {
     } else {
       getStorage.remove(_sessionKey);
     }
+  }
+}
+
+/// 给每个请求带上 `Referer = 当前请求 URI`。
+/// 金智 CAS 的部分风控分支会校验 Referer，缺了它更容易被判异常。
+class RefererInterceptor extends Interceptor {
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.headers['Referer'] = options.uri.toString();
+    handler.next(options);
   }
 }
 

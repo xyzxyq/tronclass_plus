@@ -26,4 +26,7 @@ class GetStorageKeys {
   static const lastLoginUsername = "lastLoginUsername";
   static const savedAccounts = "savedAccounts";
   static const accountEncryptionKey = "accountEncryptionKey";
+
+  /// CAS 浏览器指纹（bfp），按帐号持久化，模拟真实浏览器稳定指纹
+  static String casBfp(String username) => "cas_bfp_$username";
 }
