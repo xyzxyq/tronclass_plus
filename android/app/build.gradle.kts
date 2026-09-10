@@ -25,9 +25,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
+    // jvmTarget 统一在根 build.gradle.kts 的 KotlinJvmCompile 里设成 JVM_11。
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
@@ -57,6 +55,14 @@ android {
 //        }
     }
 
+    // 原来在 AndroidManifest 里写的 android:extractNativeLibs="true"。
+    // AGP 9 不再接受写在清单里，改成这里声明。
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             ndk {
@@ -66,7 +72,7 @@ android {
             if (localProperties["storeFile"] != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             isMinifyEnabled = true
             isShrinkResources = true
         }

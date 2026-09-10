@@ -22,7 +22,7 @@ TronClass Plus 是面向桂电同学的非官方 Tronclass 客户端，主打签
 
 ## 开发
 
-1. 安装 Flutter 3.35.0+（建议使用 fvm 管理）
+1. 安装 Flutter 3.47.0+（建议使用 fvm 管理），并确保 `rustup` 在 PATH 里（wxscan 的 build hook 首次构建要编 Rust）
 2. 执行 `flutter pub get` 拉取依赖
 3. 根据目标平台运行：`flutter run -d android` / `-d ios` / `-d macos` / `-d windows` / `-d chrome`
 4. 如需地图或 Web 功能，请确认本地网络可访问对应服务（中国大陆地区可能需要科学上网）
