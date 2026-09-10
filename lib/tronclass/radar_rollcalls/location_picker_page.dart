@@ -1,13 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../map/mapkit_config.dart';
 import 'location_selection.dart';
 
 class LocationPickerPageArgs {
@@ -27,7 +27,7 @@ class LocationPickerPage extends StatefulWidget {
 
 class _LocationPickerPageState extends State<LocationPickerPage> {
   static const LatLng _campusLatLng = LatLng(25.2854, 110.3290);
-  final MapController _mapController = MapController();
+  MapLibreMapController? _mapController;
   LatLng _selectedPosition = _campusLatLng;
   double _selectedAccuracy = 30;
   String _statusText = '正在获取位置...';
@@ -37,6 +37,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
   bool _mapReady = false;
   double _currentZoom = 16;
   Timer? _reverseGeocodeDebounce;
+
+  /// 样式还没加载完就拿到了定位，等 onStyleLoaded 再挪相机。
+  LatLng? _pendingCameraTarget;
 
   @override
   void initState() {
@@ -109,12 +112,32 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
     return true;
   }
 
-  void _onMapMoveEnd(MapCamera camera) {
+  void _onMapCreated(MapLibreMapController controller) {
+    _mapController = controller;
+  }
+
+  void _onStyleLoaded() {
+    _mapReady = true;
+    final pending = _pendingCameraTarget;
+    _pendingCameraTarget = null;
+    if (pending != null) _moveCamera(pending);
+  }
+
+  /// 手指松开、相机停下来之后，屏幕中心那个点就是选中的位置。
+  void _onCameraIdle() {
+    final camera = _mapController?.cameraPosition;
+    if (camera == null) return;
     setState(() {
       _currentZoom = camera.zoom;
-      _selectedPosition = camera.center;
+      _selectedPosition = camera.target;
     });
-    _scheduleReverseGeocode(camera.center);
+    _scheduleReverseGeocode(camera.target);
+  }
+
+  void _moveCamera(LatLng target) {
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(target, _currentZoom),
+    );
   }
 
   void _scheduleReverseGeocode(LatLng target) {
@@ -174,7 +197,9 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
       _selectedAccuracy = accuracy ?? _selectedAccuracy;
     });
     if (_mapReady) {
-      _mapController.move(target, _currentZoom);
+      _moveCamera(target);
+    } else {
+      _pendingCameraTarget = target;
     }
     if (fetchAddress) {
       _scheduleReverseGeocode(target);
@@ -225,30 +250,20 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
           Expanded(
             child: Stack(
               children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _selectedPosition,
-                    initialZoom: _currentZoom,
-                    onMapReady: () => setState(() => _mapReady = true),
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-                    ),
-                    onMapEvent: (event) {
-                      if (event is MapEventMoveEnd) {
-                        _onMapMoveEnd(event.camera);
-                      } else if (event is MapEventMove) {
-                        _currentZoom = event.camera.zoom;
-                      }
-                    },
+                MapLibreMap(
+                  styleString: MapConfig.tileStyleUrl,
+                  initialCameraPosition: CameraPosition(
+                    target: _selectedPosition,
+                    zoom: _currentZoom,
                   ),
-                  children: [
-                    TileLayer(
-                      urlTemplate:
-                          'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.verygoodapp.tronclass',
-                    ),
-                  ],
+                  trackCameraPosition: true,
+                  myLocationEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  minMaxZoomPreference: const MinMaxZoomPreference(1, 20),
+                  onMapCreated: _onMapCreated,
+                  onStyleLoadedCallback: _onStyleLoaded,
+                  onCameraIdle: _onCameraIdle,
                 ),
                 const IgnorePointer(
                   child: Center(
@@ -293,7 +308,7 @@ class _LocationPickerPageState extends State<LocationPickerPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '提示：如果您位于中国大陆，可能需要科学上网以加载地图瓦片。',
+                  '提示：地图瓦片来自 OpenFreeMap，如果您位于中国大陆，可能需要科学上网才能加载。',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.outline,
                   ),

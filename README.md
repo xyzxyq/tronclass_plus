@@ -7,7 +7,7 @@ TronClass Plus 是面向桂电同学的非官方 Tronclass 客户端，主打签
 
 - **多账号管理**：登录信息加密存储，快速切换、删除、添加账号，登录页也可直接管理账号。
 - **雷达点名助手**：动画反馈、状态提示，一键重试，异常信息清晰可见。
-- **地图定位**：基于 OpenStreetMap 的地点选择器，支持逆地理编码、WGS84 ➜ GCJ-02 自动转换。
+- **地图定位**：MapLibre 矢量地图（瓦片来自 OpenFreeMap，数据是 OpenStreetMap）的地点选择器，支持逆地理编码、WGS84 ➜ GCJ-02 自动转换。
 - **Tronclass Web 入口**：内置 WebView 同步 Cookie、验证码弹窗、桌面/移动 UA 切换、缓存清理。
 - **二维码 / 数字签到**：独立页面快速扫码或填码，配合 ChangkeClient 完成后台请求。
 
@@ -30,7 +30,7 @@ TronClass Plus 是面向桂电同学的非官方 Tronclass 客户端，主打签
 ## 依赖栈
 
 - Flutter + GetX 状态管理
-- webview_flutter / flutter_map / geolocator / geocoding
+- webview_flutter / maplibre_gl / geolocator / geocoding
 - encrypt + get_storage 密钥存储
 - wxscan_live 扫码（wechat_qrcode 的 Rust 实现）
 - dio, share_plus, permission_handler 等常用插件
@@ -63,7 +63,7 @@ check-ins, and a polished multi-account experience across Android, iOS, macOS, W
   vault, quick user switching, and login history management.
 - **Radar Rollcall Assistant** – Visual radar animation with retry guidance and backend status
   tracking.
-- **Interactive Map Picker** – Choose rollcall coordinates on OpenStreetMap tiles, reverse-geocode
+- **Interactive Map Picker** – Choose rollcall coordinates on MapLibre vector tiles (served by OpenFreeMap, OpenStreetMap data), reverse-geocode
   addresses, and automatically convert WGS84 ➜ GCJ-02 before submission.
 - **Tronclass Web Portal** – Built-in WebView (webview_flutter) with cookie sync, captcha handling,
   user-agent switching, and cache cleaning.
@@ -98,7 +98,7 @@ lib/
 
 - **Flutter + GetX** for reactive state and navigation
 - **webview_flutter** for the embedded Tronclass portal
-- **flutter_map + geolocator + geocoding** for selecting and reverse-geocoding locations
+- **maplibre_gl + geolocator + geocoding** for selecting and reverse-geocoding locations
 - **encrypt + get_storage** for secure multi-account storage
 - **share_plus, permission_handler, dio** for platform capabilities and networking
 
