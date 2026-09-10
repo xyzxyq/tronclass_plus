@@ -10,7 +10,9 @@ import 'package:tronclass/auth/saved_account_storage.dart';
 import 'package:tronclass/common/toast.dart';
 import 'package:tronclass/data/changke_client.dart';
 import 'package:tronclass/data/get_storage.dart';
+import 'package:tronclass/data/org_store.dart';
 import 'package:tronclass/data/service/login.dart';
+import 'package:tronclass/data/service/tronclass.dart';
 
 class LoginController extends GetxController {
   LoginController({this.initialUsername, this.initialPassword});
@@ -36,7 +38,6 @@ class LoginController extends GetxController {
         getStorage.read<String>(GetStorageKeys.lastLoginUsername);
     if (savedUsername?.isNotEmpty ?? false) {
       usernameController.text = savedUsername!;
-      ChangkeClient.getInstance(username: savedUsername);
     }
     final prefPassword = initialPassword;
     if (prefPassword?.isNotEmpty ?? false) {
@@ -55,7 +56,13 @@ class LoginController extends GetxController {
 
     final username = usernameController.text.trim();
     final password = passwordController.text;
-    final client = ChangkeClient.getInstance(username: username);
+    // 这条是桂电专用的账号密码直登（走 CAS），先把学校切回桂电，
+    // 否则接口地址还停在上一次通用登录选的学校上。
+    await AppOrg.setCurrent(AppOrg.guet);
+    final client = ChangkeClient.getInstance(
+      username: username,
+      org: AppOrg.guet,
+    );
 
     final attemptLimit = isFirstLoginAttempt.value ? 3 : 1;
     isFirstLoginAttempt.value = false;
@@ -72,6 +79,9 @@ class LoginController extends GetxController {
         await SavedAccountStorage.upsertAccount(
           username: username,
           password: password,
+          displayName: await _fetchDisplayName(client),
+          org: AppOrg.guet,
+          loginMethod: LoginMethod.password,
         );
         await getStorage.write(GetStorageKeys.lastLoginUsername, username);
         await getStorage.write(GetStorageKeys.isCleanWebSession, true);
@@ -114,6 +124,17 @@ class LoginController extends GetxController {
 
     if (!isClosed) {
       isSubmitting.value = false;
+    }
+  }
+
+  /// 取一次姓名，给账号列表用。拿不到不影响登录。
+  Future<String?> _fetchDisplayName(ChangkeClient client) async {
+    try {
+      final profile = await TronClassService.getProfile(client.dio);
+      final name = profile['name'];
+      return name is String && name.isNotEmpty ? name : null;
+    } catch (_) {
+      return null;
     }
   }
 

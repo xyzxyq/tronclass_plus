@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:get/get.dart';
-import 'package:uuid/uuid.dart';
 import 'package:tronclass/data/changke_client.dart';
 import 'package:tronclass/data/service/tronclass.dart';
 import 'package:tronclass/routes.dart';
@@ -83,7 +82,8 @@ class RadarRollcallsController extends GetxController {
     isScanning.value = true;
 
     try {
-      final deviceId = Uuid().v4();
+      // 设备号跟着账号走，同一个账号每次签到都是同一台设备
+      final deviceId = ChangkeClient.instance.deviceId;
 
       // 调用雷达签到接口
       final response = await TronClassService.signRadar(

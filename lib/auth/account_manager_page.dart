@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:tronclass/auth/account_manager_controller.dart';
+import 'package:tronclass/auth/saved_account_storage.dart';
+import 'package:tronclass/data/backup/backup_actions.dart';
 import 'package:tronclass/routes.dart';
 
 class AccountManagerPage extends StatelessWidget {
@@ -20,6 +22,35 @@ class AccountManagerPage extends StatelessWidget {
                 onPressed: controller.loadAccounts,
                 icon: const Icon(Icons.refresh),
               ),
+              PopupMenuButton<int>(
+                tooltip: '备份',
+                onSelected: (value) async {
+                  if (value == 0) {
+                    await BackupActions.export();
+                  } else {
+                    await BackupActions.import();
+                    controller.loadAccounts();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem(
+                    value: 0,
+                    child: ListTile(
+                      leading: Icon(Icons.upload_file),
+                      title: Text('导出数据'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    value: 1,
+                    child: ListTile(
+                      leading: Icon(Icons.download),
+                      title: Text('导入数据'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
           body: Obx(() {
@@ -34,60 +65,119 @@ class AccountManagerPage extends StatelessWidget {
               itemBuilder: (context, index) {
                 final account = accounts[index];
                 final isCurrent = account.username == currentUser;
+                final hasSession = controller.hasSession(account);
                 return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Row(
+                  clipBehavior: Clip.antiAlias,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(child: Text(account.username)),
-                        // Expanded(child: Text('示意账号')),
-                        if (isCurrent)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              '当前',
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.primary,
-                                fontSize: 12,
+                        // 姓名（学号）单独一行，太长就省略，别把「当前」挤没
+                        Row(
+                          children: [
+                            const Icon(Icons.person_outline, size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                account.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium,
                               ),
                             ),
-                          ),
-                      ],
-                    ),
-                    subtitle: Text(
-                      '最近更新：${account.updatedAt.toLocal().toString().split('.').first}',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.arrow_forward),
-                          onPressed: isProcessing
-                              ? null
-                              : () => controller.loginWithAccount(account),
+                            if (isCurrent) _CurrentBadge(),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: isProcessing
-                              ? null
-                              : () async {
-                                  final confirmed = await _confirmDeletion(
-                                    context,
-                                    account.username,
-                                  );
-                                  if (confirmed == true) {
-                                    controller.deleteAccount(account.username);
-                                  }
-                                },
+                        const SizedBox(height: 8),
+                        _InfoLine(icon: Icons.school_outlined, text: account.org.orgName),
+                        const SizedBox(height: 4),
+                        _InfoLine(
+                          icon: account.loginMethod == LoginMethod.password
+                              ? Icons.password_outlined
+                              : Icons.public_outlined,
+                          text: account.loginMethodLabel,
+                        ),
+                        const SizedBox(height: 4),
+                        _InfoLine(
+                          icon: hasSession
+                              ? Icons.verified_user_outlined
+                              : Icons.gpp_maybe_outlined,
+                          text: hasSession ? '登录态还在，可直接切换' : '没有登录态，需要登录',
+                          highlight: !hasSession,
+                        ),
+                        const SizedBox(height: 4),
+                        _InfoLine(
+                          icon: Icons.schedule_outlined,
+                          text: '最近更新 '
+                              '${account.updatedAt.toLocal().toString().split('.').first}',
+                        ),
+                        const Divider(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            if (isCurrent)
+                              TextButton.icon(
+                                onPressed: isProcessing
+                                    ? null
+                                    : controller.logoutCurrent,
+                                icon: const Icon(Icons.logout, size: 18),
+                                label: const Text('退出'),
+                              ),
+                            if (isCurrent) const SizedBox(width: 4),
+                            TextButton.icon(
+                              onPressed: isProcessing
+                                  ? null
+                                  : () async {
+                                      final confirmed = await _confirmDeletion(
+                                        context,
+                                        account.label,
+                                      );
+                                      if (confirmed == true) {
+                                        controller.deleteAccount(
+                                          account.username,
+                                        );
+                                      }
+                                    },
+                              icon: const Icon(Icons.delete_outline, size: 18),
+                              label: const Text('删除'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: Theme.of(
+                                  context,
+                                ).colorScheme.error,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            // 登录态还在就直接切，别让人白登一次
+                            if (hasSession && !isCurrent)
+                              TextButton.icon(
+                                onPressed: isProcessing
+                                    ? null
+                                    : () => controller.loginWithAccount(account),
+                                icon: const Icon(Icons.refresh, size: 18),
+                                label: const Text('重新登录'),
+                              ),
+                            if (hasSession && !isCurrent)
+                              const SizedBox(width: 4),
+                            FilledButton.tonalIcon(
+                              onPressed: isProcessing
+                                  ? null
+                                  : () => hasSession && !isCurrent
+                                        ? controller.switchToAccount(account)
+                                        : controller.loginWithAccount(account),
+                              icon: Icon(
+                                hasSession && !isCurrent
+                                    ? Icons.swap_horiz
+                                    : Icons.login,
+                                size: 18,
+                              ),
+                              label: Text(
+                                hasSession && !isCurrent
+                                    ? '切换'
+                                    : (isCurrent ? '重新登录' : '登录'),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -138,6 +228,61 @@ class AccountManagerPage extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+/// 「当前」小标签。
+class _CurrentBadge extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '当前',
+        style: TextStyle(color: scheme.onPrimaryContainer, fontSize: 12),
+      ),
+    );
+  }
+}
+
+/// 卡片里的一行说明：一个小图标加一段文字，长了自己换行。
+class _InfoLine extends StatelessWidget {
+  const _InfoLine({
+    required this.icon,
+    required this.text,
+    this.highlight = false,
+  });
+
+  final IconData icon;
+  final String text;
+
+  /// 需要用户注意的信息（比如登录态没了）用强调色。
+  final bool highlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final color = highlight ? scheme.error : scheme.onSurfaceVariant;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16, color: highlight ? scheme.error : scheme.outline),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: color),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 
 import 'package:tronclass/auth/auth_controller.dart';
 import 'package:tronclass/data/changke_client.dart';
+import 'package:tronclass/data/org_store.dart';
 import 'package:tronclass/routes.dart';
 import 'package:tronclass/webview/webview.dart';
 
@@ -28,17 +29,29 @@ class TronClassPage extends StatelessWidget {
       child: Builder(
         builder: (context) {
           return Scaffold(
-            appBar: AppBar(title: const Text('桂林电子科大学'), centerTitle: true),
+            appBar: AppBar(
+              title: Obx(
+                () => Text(
+                  auth.orgName.value.isEmpty
+                      ? AppOrg.current.orgName
+                      : auth.orgName.value,
+                ),
+              ),
+              centerTitle: true,
+            ),
             bottomNavigationBar: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: FilledButton(
                   onPressed: () {
-                    final url = "https://mobile.guet.edu.cn";
+                    // 桂电有单独的移动门户，其他学校直接开畅课网页版
+                    final url = AppOrg.isGuet
+                        ? "https://mobile.guet.edu.cn"
+                        : AppOrg.current.apiUrl;
                     Get.toNamed(
                       AppRoute.webView,
                       arguments: WebViewArgs(url: url),
-                    );
+                    )?.then((_) => auth.refreshState());
                   },
                   style: ButtonStyle(
                     shape: WidgetStateProperty.all(
@@ -155,128 +168,102 @@ class TronClassPage extends StatelessWidget {
 
                     const SizedBox(height: 24),
 
-                    // 最近访问
-                    const Text(
-                      "最近访问",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    // SizedBox(
-                    //   height: 100, // 视具体需求可调整
-                    //   child: Obx(() {
-                    //     return ListView.separated(
-                    //       scrollDirection: Axis.horizontal,
-                    //       itemCount: c.recentItems.length,
-                    //       separatorBuilder: (context, index) =>
-                    //       const SizedBox(width: 8),
-                    //       itemBuilder: (context, index) {
-                    //         final item = c.recentItems[index];
-                    //         return _buildRecentItemCard(item);
-                    //       },
-                    //     );
-                    //   }),
-                    // ),
-
-                    // const SizedBox(height: 24),
-
-                    // 待办事项示例
-                    const Text(
-                      "待办事项",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-
-                    // const SizedBox(height: 8),
-                    // _buildTodoList(),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
 
                     Obx(() {
                       final loggedIn = auth.isLoggedIn.value;
+                      final scheme = Theme.of(context).colorScheme;
                       return Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              loggedIn
-                                  ? Icons.verified_user
-                                  : Icons.lock_outline,
-                              color: loggedIn
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Colors.orange,
+                          // 跟上面那张扫码/签到卡一个底色，别自成一格
+                          color: scheme.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 10,
+                              spreadRadius: 1,
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                    child: Text(
-                                      loggedIn
-                                          ? '已登录，随时可以签到'
-                                          : '尚未登录，请先登录再签到',
-                                      style:
-                                          Theme.of(context).textTheme.bodyLarge,
-                                    ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  loggedIn
+                                      ? Icons.verified_user
+                                      : Icons.lock_outline,
+                                  color: loggedIn
+                                      ? scheme.primary
+                                      : scheme.error,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        loggedIn
+                                            ? auth.accountLabel.value
+                                            : '还没有登录',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        loggedIn
+                                            ? [
+                                                auth.orgName.value,
+                                                auth.loginMethodLabel.value,
+                                              ].where((e) => e.isNotEmpty).join(' · ')
+                                            : '登录后才能签到',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 4,
-                                    ),
-                                    child: Wrap(
-                                      spacing: 8,
-                                      runSpacing: 4,
-                                      children: [
-                                        TextButton(
-                                          onPressed: () async {
-                                            final result = await Get.toNamed(
-                                              AppRoute.loginPage,
-                                            );
-                                            if (result == true) {
-                                              auth.refreshState();
-                                            }
-                                          },
-                                          child: Text(
-                                            loggedIn ? '添加账号' : '去登录',
-                                          ),
-                                        ),
-                                        if (loggedIn)
-                                          TextButton(
-                                            onPressed: auth.logout,
-                                            child: const Text('退出'),
-                                          ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            final result = await Get.toNamed(
-                                              AppRoute.accountManagerPage,
-                                            );
-                                            if (result == true) {
-                                              auth.refreshState();
-                                            }
-                                          },
-                                          child: const Text('切换账号'),
-                                        ),
-                                      ],
-                                    ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                if (loggedIn) ...[
+                                  const Spacer(),
+                                  // 退出、删除这些都归管理页，首页只留入口
+                                  FilledButton.tonal(
+                                    onPressed: () async {
+                                      final result = await Get.toNamed(
+                                        AppRoute.accountManagerPage,
+                                      );
+                                      if (result == true) auth.refreshState();
+                                    },
+                                    child: const Text('管理账号'),
+                                  ),
+                                ] else ...[
+                                  const Spacer(),
+                                  FilledButton(
+                                    onPressed: () async {
+                                      final result = await Get.toNamed(
+                                        AppRoute.loginPage,
+                                      );
+                                      if (result == true) auth.refreshState();
+                                    },
+                                    child: const Text('登录'),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
                           ],
                         ),
@@ -390,49 +377,6 @@ class TronClassPage extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  /// 构建最近访问卡片
-  Widget _buildRecentItemCard(String title) {
-    return Container(
-      width: 120,
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Center(
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 14),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  /// 构建待办事项列表
-  Widget _buildTodoList() {
-    // 这里简单模拟一下待办事项
-    final todoItems = ["计算机视觉课程调研问卷", "作业提交", "论文写作进度跟进"];
-
-    return ListView.separated(
-      physics: const NeverScrollableScrollPhysics(),
-      // 禁止内部滚动，避免和外层冲突
-      shrinkWrap: true,
-      itemCount: todoItems.length,
-      separatorBuilder: (context, index) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final todo = todoItems[index];
-        return ListTile(
-          title: Text(todo),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () {
-            // 点击事件...
-          },
-        );
-      },
     );
   }
 }

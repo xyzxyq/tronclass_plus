@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:kt_dart/kt.dart';
 import 'package:tronclass/data/changke_client.dart';
 import 'package:vibration/vibration.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../data/service/tronclass.dart';
 import '../../../../data/util/changke.dart';
@@ -181,7 +180,8 @@ class _QrSignResultPageState extends State<QrSignResultPage> {
 
   Future<void> _performSignIn() async {
     try {
-      final deviceId = Uuid().v4();
+      // 设备号跟着账号走，同一个账号每次签到都是同一台设备
+      final deviceId = ChangkeClient.instance.deviceId;
 
       // 真实的API调用
       final response = await TronClassService.signQr(

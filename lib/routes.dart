@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:tronclass/auth/account_manager_page.dart';
 import 'package:tronclass/auth/login_page.dart';
+import 'package:tronclass/auth/org_search_page.dart';
+import 'package:tronclass/auth/web_login_credential.dart';
+import 'package:tronclass/auth/webview_login_page.dart';
 import 'package:tronclass/tronclass/number_rollcalls/number_rollcalls_page.dart';
 import 'package:tronclass/tronclass/qr_rollcalls/qr_rollcalls_page.dart';
 import 'package:tronclass/tronclass/radar_rollcalls/location_picker_page.dart';
@@ -22,6 +25,12 @@ class AppRoute {
   static const String webView = '/webview';
   static const String loginPage = '/login';
   static const String accountManagerPage = '/account-manager';
+
+  /// 通用登录：搜学校
+  static const String orgSearchPage = '/org-search';
+
+  /// 通用登录：统一身份认证 WebView
+  static const String webviewLoginPage = '/webview-login';
 
   static final List<GetPage<dynamic>> routes = [
     GetPage(name: tronClassPage, page: () => const TronClassPage()),
@@ -44,6 +53,15 @@ class AppRoute {
     ),
     GetPage(name: loginPage, page: () => const LoginPage()),
     GetPage(name: accountManagerPage, page: () => const AccountManagerPage()),
+    GetPage(
+      name: orgSearchPage,
+      page: () =>
+          OrgSearchPage(credential: _requireArgs<WebLoginCredential>()),
+    ),
+    GetPage(
+      name: webviewLoginPage,
+      page: () => WebViewLoginPage(args: _requireArgs<WebViewLoginArgs>()),
+    ),
     GetPage(
       name: webView,
       page: () => WebView(args: _requireArgs<WebViewArgs>()),

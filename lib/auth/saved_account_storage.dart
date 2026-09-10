@@ -4,39 +4,93 @@ import 'dart:typed_data';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
 import 'package:tronclass/data/get_storage.dart';
+import 'package:tronclass/data/model/tron_org.dart';
+import 'package:tronclass/data/org_store.dart';
 
 class SavedAccount {
   final String username;
-  final String encryptedPassword;
-  final String iv;
+
+  /// 姓名，来自 `/api/profile` 的 `name`。拿不到就是 null，
+  /// 界面上退回显示学号。
+  final String? displayName;
+
+  /// 密码只有桂电账号密码直登才有；通用（WebView）登录拿不到密码，这里是 null。
+  final String? encryptedPassword;
+  final String? iv;
+
+  /// 这个账号属于哪所学校。老数据没有这个字段，按桂电算。
+  final TronOrg org;
+
+  /// 当初是怎么登进来的，见 [LoginMethod]。老数据没记，
+  /// 按「有没有存密码」倒推。
+  final String loginMethod;
   final DateTime updatedAt;
 
   SavedAccount({
     required this.username,
-    required this.encryptedPassword,
-    required this.iv,
+    this.displayName,
+    this.encryptedPassword,
+    this.iv,
+    required this.org,
+    required this.loginMethod,
     required this.updatedAt,
   });
+
+  /// 有密码才能一键重登；没有的只能再走一次网页登录。
+  bool get canReloginSilently => encryptedPassword != null && iv != null;
+
+  String get loginMethodLabel => loginMethod == LoginMethod.password
+      ? '账号密码登录'
+      : '网页登录';
+
+  /// 列表上给人看的标题：有姓名就「姓名（学号）」，没有就只有学号。
+  String get label => (displayName == null || displayName!.isEmpty)
+      ? username
+      : '$displayName（$username）';
 
   Map<String, dynamic> toMap() {
     return {
       'username': username,
+      'displayName': displayName,
+      'loginMethod': loginMethod,
       'encryptedPassword': encryptedPassword,
       'iv': iv,
+      'org': org.toJson(),
       'updatedAt': updatedAt.toIso8601String(),
     };
   }
 
   factory SavedAccount.fromMap(Map<String, dynamic> map) {
+    final rawOrg = map['org'];
     return SavedAccount(
       username: map['username'] as String,
-      encryptedPassword: map['encryptedPassword'] as String,
-      iv: map['iv'] as String,
+      displayName: map['displayName'] as String?,
+      encryptedPassword: map['encryptedPassword'] as String?,
+      iv: map['iv'] as String?,
+      org: (rawOrg is Map
+              ? TronOrg.fromJson(Map<String, dynamic>.from(rawOrg))
+              : null) ??
+          AppOrg.guet,
+      loginMethod: (map['loginMethod'] as String?) ??
+          (map['encryptedPassword'] == null
+              ? LoginMethod.webView
+              : LoginMethod.password),
       updatedAt:
           DateTime.tryParse(map['updatedAt'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
     );
   }
+}
+
+/// 账号是怎么登进来的。
+class LoginMethod {
+  LoginMethod._();
+
+  /// 账号密码直登（桂电走 CAS 那条）。
+  static const password = 'password';
+
+  /// 网页登录：在学校的统一身份认证页面里登。
+  static const webView = 'webview';
 }
 
 class SavedAccountStorage {
@@ -83,19 +137,38 @@ class SavedAccountStorage {
     );
   }
 
+  /// 保存/更新一个账号。[password] 只有桂电直登那条路会传；
+  /// 通用登录只传 [org]。[displayName] 拿不到时沿用已存的，别把名字冲掉。
   static Future<void> upsertAccount({
     required String username,
-    required String password,
+    String? password,
+    String? displayName,
+    TronOrg? org,
+    required String loginMethod,
   }) async {
     final accounts = loadAccounts();
-    final ivBytes = _randomBytes(_ivLength);
-    final iv = encrypt.IV(ivBytes);
-    final encrypted = _buildEncrypter().encrypt(password, iv: iv);
+    final existing = accounts
+        .where((e) => e.username == username)
+        .cast<SavedAccount?>()
+        .firstWhere((e) => true, orElse: () => null);
+    String? encryptedPassword;
+    String? ivBase64;
+    if (password != null && password.isNotEmpty) {
+      final ivBytes = _randomBytes(_ivLength);
+      final iv = encrypt.IV(ivBytes);
+      encryptedPassword = _buildEncrypter().encrypt(password, iv: iv).base64;
+      ivBase64 = base64Encode(ivBytes);
+    }
 
     final updated = SavedAccount(
       username: username,
-      encryptedPassword: encrypted.base64,
-      iv: base64Encode(ivBytes),
+      displayName: (displayName != null && displayName.isNotEmpty)
+          ? displayName
+          : existing?.displayName,
+      encryptedPassword: encryptedPassword,
+      iv: ivBase64,
+      org: org ?? AppOrg.current,
+      loginMethod: loginMethod,
       updatedAt: DateTime.now(),
     );
 
@@ -110,9 +183,12 @@ class SavedAccountStorage {
   }
 
   static String? decryptPassword(SavedAccount account) {
+    final rawIv = account.iv;
+    final rawPassword = account.encryptedPassword;
+    if (rawIv == null || rawPassword == null) return null;
     try {
-      final iv = encrypt.IV(base64Decode(account.iv));
-      final encrypted = encrypt.Encrypted.from64(account.encryptedPassword);
+      final iv = encrypt.IV(base64Decode(rawIv));
+      final encrypted = encrypt.Encrypted.from64(rawPassword);
       return _buildEncrypter().decrypt(encrypted, iv: iv);
     } catch (_) {
       return null;

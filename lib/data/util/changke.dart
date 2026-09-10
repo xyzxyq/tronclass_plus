@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:tronclass/data/org_store.dart';
+
 class _UrlAnalysis {
   // 定义特殊字符
   static final String ta = String.fromCharCode(30);
@@ -9,8 +11,8 @@ class _UrlAnalysis {
   static final String ia = na + "1";
   static final String oa = na + "0";
 
-  // 假设 base_url 是全局变量
-  static final String baseUrl = 'https://courses.guet.edu.cn';
+  // 扫码结果里的相对路径要补成当前学校的地址
+  static String get baseUrl => AppOrg.current.apiUrl;
 
   // 辅助函数：将整数转换为 base36 字符串
   static String toBase36(int num) {

@@ -5,7 +5,6 @@ import 'package:pure_dart_extensions/pure_dart_extensions.dart';
 import 'package:tronclass/common/toast.dart';
 import 'package:tronclass/data/changke_client.dart';
 import 'package:tronclass/data/service/tronclass.dart';
-import 'package:uuid/uuid.dart';
 
 enum RollcallState {
   input, // 输入状态
@@ -86,7 +85,8 @@ class NumberRollcallsController extends GetxController {
     var found = false;
     var abort = false;
     String? lastErrorMessage;
-    final deviceId = Uuid().v4();
+    // 设备号跟着账号走，同一个账号每次签到都是同一台设备
+    final deviceId = ChangkeClient.instance.deviceId;
 
     Future<void> worker() async {
       while (true) {
@@ -133,7 +133,7 @@ class NumberRollcallsController extends GetxController {
 
   Future<bool> _performSignRequest(String inputCode,
       {String? deviceIdOverride}) async {
-    final deviceId = deviceIdOverride ?? Uuid().v4();
+    final deviceId = deviceIdOverride ?? ChangkeClient.instance.deviceId;
     final response = await TronClassService.signNumber(
         ChangkeClient.instance.dio,
         rollcallId: rollcallId.toString(),

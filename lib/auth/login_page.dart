@@ -2,10 +2,27 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:tronclass/auth/login_controller.dart';
+import 'package:tronclass/auth/web_login_credential.dart';
+import 'package:tronclass/data/org_store.dart';
 import 'package:tronclass/routes.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
+
+  /// 其他学校：账号密码一样要填（登录时要靠它快速填充），
+  /// 填好再去选学校。
+  Future<void> _loginOtherOrg(LoginController controller) async {
+    if (!(controller.formKey.currentState?.validate() ?? false)) return;
+
+    final result = await Get.toNamed(
+      AppRoute.orgSearchPage,
+      arguments: WebLoginCredential(
+        username: controller.usernameController.text.trim(),
+        password: controller.passwordController.text,
+      ),
+    );
+    if (result == true) Get.back(result: true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +99,7 @@ class LoginPage extends StatelessWidget {
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                '使用教务系统账户登录 TronClass Plus，进行扫码签到',
+                                '填好账号密码，再选下面对应的登录方式',
                                 style: Theme.of(context).textTheme.bodyMedium,
                                 textAlign: TextAlign.center,
                               ),
@@ -93,8 +110,8 @@ class LoginPage extends StatelessWidget {
                           controller: controller.usernameController,
                           autofocus: false,
                           decoration: const InputDecoration(
-                            labelText: '学号',
-                            hintText: '您的学号',
+                            labelText: '账号',
+                            hintText: '学号 / 工号',
                             prefixIcon: Icon(Icons.person),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.all(
@@ -103,7 +120,7 @@ class LoginPage extends StatelessWidget {
                             ),
                           ),
                           validator: (v) {
-                            return v!.trim().isNotEmpty ? null : '学号不能为空';
+                            return v!.trim().isNotEmpty ? null : '账号不能为空';
                           },
                         ),
                         const SizedBox(height: 16),
@@ -113,8 +130,8 @@ class LoginPage extends StatelessWidget {
                             obscureText: !controller.passwordVisible.value,
                             autofocus: false,
                             decoration: InputDecoration(
-                              labelText: '智慧校园密码',
-                              hintText: '初始为 Guet@身份证后六位',
+                              labelText: '密码',
+                              hintText: '学校统一身份认证的密码',
                               prefixIcon: const Icon(Icons.lock),
                               suffixIcon: IconButton(
                                 icon: Icon(
@@ -146,10 +163,33 @@ class LoginPage extends StatelessWidget {
                             ),
                             child: controller.isSubmitting.value
                                 ? const Text('正在登录...')
-                                : const Text('登录'),
+                                : Text('${AppOrg.guet.orgName}登录'),
                           ),
                         ),
-                        TextButton(
+                        const SizedBox(height: 12),
+                        Obx(
+                          () => OutlinedButton(
+                            onPressed: controller.isSubmitting.value
+                                ? null
+                                : () => _loginOtherOrg(controller),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 50),
+                            ),
+                            child: const Text('其他学校登录'),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '其他学校要先选学校，再在学校自己的登录页面里登；'
+                          '上面填的账号密码会浮在页面上，点一下就能复制。',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                        ),
+                        const SizedBox(height: 16),
+                        // 已经登过的账号多数时候是从这里回来的，别做成一行小字
+                        OutlinedButton.icon(
                           onPressed: () async {
                             final result = await Get.toNamed(
                               AppRoute.accountManagerPage,
@@ -158,7 +198,20 @@ class LoginPage extends StatelessWidget {
                               Get.back(result: true);
                             }
                           },
-                          child: const Text('管理已保存账号'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 50),
+                            side: BorderSide(
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            foregroundColor: Theme.of(
+                              context,
+                            ).colorScheme.primary,
+                          ),
+                          icon: const Icon(Icons.manage_accounts),
+                          label: const Text(
+                            '管理已保存账号',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ],
                     ),

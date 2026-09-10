@@ -1,7 +1,2 @@
 #include "../../Flutter/Flutter-Release.xcconfig"
 #include "Warnings.xcconfig"
-
-// macOS 的 release 默认是 universal(arm64 + x86_64)，而扫码用的 wxscan 只
-// 提供 Apple Silicon 的 TFLite 库，universal 构建会在 build hook 里直接失败。
-// 这里固定成 arm64;Intel Mac 需要支持的话得等上游出 x86_64 的库。
-ARCHS = arm64
