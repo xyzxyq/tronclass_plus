@@ -1,16 +1,13 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:kt_dart/kt.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:tronclass/data/changke_client.dart';
 import 'package:vibration/vibration.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../data/service/tronclass.dart';
 import '../../../../data/util/changke.dart';
+import '../../widget/wx_scan_view.dart';
 import '../common.dart';
 import 'sign_result.dart';
 
@@ -21,206 +18,97 @@ class QrRollcallsPage extends StatefulWidget {
   State<QrRollcallsPage> createState() => _QrRollcallsPageState();
 }
 
-class _QrRollcallsPageState extends State<QrRollcallsPage>
-    with WidgetsBindingObserver {
-  // 扫描相关状态
-  bool hasCustomVibrationsSupport = false;
-  bool isFlash = false;
-  MobileScannerController? controller;
-  double _currentScale = 1.0;
-  double _baseScale = 1.0;
-  final double _scaleThreshold = 0.15;
-  double _lastScaleUpdate = 1.0;
-  final double _zoomFactor = 2.0;
+class _QrRollcallsPageState extends State<QrRollcallsPage> {
+  final _scanController = WxScanViewController();
 
-  // 简化状态管理
-  bool isProcessing = false;
+  bool hasCustomVibrationsSupport = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     initAsync();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    controller?.dispose();
+    _scanController.dispose();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // 应用重新显示时，检查相机状态
-      if (mounted && !isProcessing) {
-        _ensureCameraRunning();
-      }
-    }
-  }
-
-  // 确保相机运行
-  void _ensureCameraRunning() {
-    if (controller != null && mounted) {
-      controller?.start();
-    }
-  }
-
   initAsync() async {
-    try {
-      // 检查振动支持
-      (await Vibration.hasCustomVibrationsSupport())?.let((it) {
-        if (mounted) {
-          setState(() {
-            hasCustomVibrationsSupport = it;
-          });
-        }
-      });
-
-      // 检查相机权限
-      if (GetPlatform.isMobile) {
-        final permission = await Permission.camera.request();
-        if (!permission.isGranted) {
-          if (mounted) {
-            Get.to(() => const ChangkeSignResult(
-                  successful: false,
-                  message: "请允许相机权限才能进行扫描二维码",
-                ))?.then((_) {
-              // 返回后退出页面
-              if (mounted) Get.back();
-            });
-          }
-          return;
-        }
-      }
-    } catch (e) {
-      print("初始化错误: $e");
+    (await Vibration.hasCustomVibrationsSupport()).let((it) {
       if (mounted) {
-        Get.to(() => const ChangkeSignResult(
-              successful: false,
-              message: "初始化失败，请重试",
-            ))?.then((_) {
-          if (mounted) Get.back();
+        setState(() {
+          hasCustomVibrationsSupport = it;
         });
       }
-    }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      if (controller == null) {
-        final mediaQuery = MediaQuery.of(context);
-        final devicePixelRatio = mediaQuery.devicePixelRatio;
-        final size = Size(constraints.maxWidth, constraints.maxHeight) *
-            devicePixelRatio;
-        print("相机大小：${size}, 像素密度: ${devicePixelRatio}");
-        controller =
-            MobileScannerController(cameraResolution: Size(1080, 1920));
-      }
-
-      return Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          iconTheme: IconThemeData(
-            color: Colors.white,
-          ),
-          backgroundColor: Colors.transparent,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-          elevation: 0,
-          actions: [
-            IconButton(
-                onPressed: () {
-                  controller?.toggleTorch();
-                  setState(() {
-                    isFlash = !isFlash;
-                  });
-                },
-                icon: Icon(isFlash
-                    ? Icons.flash_off_outlined
-                    : Icons.flash_on_outlined))
-          ],
-          title: Text("二维码签到"),
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: Colors.transparent,
+        titleTextStyle: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
         ),
-        body: GestureDetector(
-          onScaleStart: (details) {
-            _baseScale = _currentScale;
-          },
-          onScaleUpdate: (details) {
-            double newScale =
-                (_baseScale * pow(details.scale, _zoomFactor)).clamp(1.0, 10.0);
-            if ((newScale - _lastScaleUpdate).abs() > _scaleThreshold) {
-              setState(() {
-                _currentScale = newScale;
-                double normalizedScale = log(_currentScale) / log(10.0);
-                controller?.setZoomScale(normalizedScale);
-                _lastScaleUpdate = newScale;
-              });
-            }
-          },
-          child: MobileScanner(
-            controller: controller,
-            onDetect: (capture) async {
-              if (isProcessing) return; // 防止重复处理
-
-              controller?.stop();
-              setState(() {
-                isProcessing = true;
-              });
-
-              if (hasCustomVibrationsSupport) {
-                Vibration.vibrate(duration: 100);
-              } else {
-                Vibration.vibrate();
-              }
-
-              await Future.delayed(Duration(milliseconds: 100));
-
-              // 处理扫描结果
-              _handleScanResult(capture);
-            },
-          overlayBuilder:
-              (BuildContext context, BoxConstraints constraints) => Center(
-            child: ScannerBox(width: 300, height: 300),
+        elevation: 0,
+        actions: [
+          // 手电筒跟着相机确认的状态走，而不是跟着"我们请求了什么"走：
+          // 没有闪光灯的机器按多少次都是关着的。
+          ListenableBuilder(
+            listenable: _scanController,
+            builder: (context, _) => _scanController.hasTorch
+                ? IconButton(
+                    onPressed: _scanController.toggleTorch,
+                    icon: Icon(_scanController.torchEnabled
+                        ? Icons.flash_off_outlined
+                        : Icons.flash_on_outlined),
+                  )
+                : const SizedBox.shrink(),
           ),
-          ),
-        ),
-      );
+        ],
+        title: const Text("二维码签到"),
+      ),
+      body: WxScanView(
+        controller: _scanController,
+        onResult: _handleScanResult,
+        onError: _handleScanError,
+      ),
+    );
+  }
+
+  void _handleScanError(Object error) {
+    if (!mounted) return;
+    Get.to(() => ChangkeSignResult(
+          successful: false,
+          message: error is WxScanPermissionDenied
+              ? "请允许相机权限才能进行扫描二维码"
+              : "初始化失败，请重试",
+        ))?.then((_) {
+      // 返回后退出页面
+      if (mounted) Get.back();
     });
   }
 
   // 处理扫描结果
-  void _handleScanResult(BarcodeCapture capture) {
+  void _handleScanResult(ScanResult result) {
+    if (hasCustomVibrationsSupport) {
+      Vibration.vibrate(duration: 100);
+    } else {
+      Vibration.vibrate();
+    }
+
     try {
-      final code = capture.barcodes.firstOrNull?.rawValue;
-      if (code == null) {
-        if (mounted) {
-          Get.to(() => const ChangkeSignResult(
-                successful: false,
-                message: "未识别到二维码",
-              ))?.then((_) {
-            if (mounted) _restartScan();
-          });
-        }
-        return;
-      }
+      final codeData = parseChangkeScanUrl(result.text);
 
-      final codeData = parseChangkeScanUrl(code);
-
-      if (!(codeData is Map)) {
-        if (mounted) {
-          Get.to(() => const ChangkeSignResult(
-                successful: false,
-                message: "二维码格式错误",
-              ))?.then((_) {
-            if (mounted) _restartScan();
-          });
-        }
+      if (codeData is! Map) {
+        _failAndRescan("二维码格式错误");
         return;
       }
 
@@ -228,144 +116,37 @@ class _QrRollcallsPageState extends State<QrRollcallsPage>
       final data = codeData['data'];
 
       if (rollcallId == null || data == null) {
-        if (mounted) {
-          Get.to(() => const ChangkeSignResult(
-                successful: false,
-                message: "二维码格式错误",
-              ))?.then((_) {
-            if (mounted) _restartScan();
-          });
-        }
+        _failAndRescan("二维码格式错误");
         return;
       }
 
       // 立即导航到签到结果页面，显示"正在签到中"
-      if (mounted) {
-        Get.to(() => QrSignResultPage(
-              rollcallId: rollcallId,
-              data: data,
-              onBack: () {
-                Get.back(); // 返回到扫描页面
-                _restartScan(); // 重新开始扫描
-              },
-            ))?.then((_) {
-          // 无论如何返回都确保相机重启
-          if (mounted) _restartScan();
-        });
-      }
+      Get.to(() => QrSignResultPage(
+            rollcallId: rollcallId,
+            data: data,
+            onBack: () {
+              Get.back(); // 返回到扫描页面
+              _restartScan(); // 重新开始扫描
+            },
+          ))?.then((_) {
+        // 无论如何返回都确保相机重启
+        _restartScan();
+      });
     } catch (e) {
       print("扫描处理错误: $e");
-      if (mounted) {
-        Get.to(() => const ChangkeSignResult(
-              successful: false,
-              message: "处理扫描结果时出错",
-            ))?.then((_) {
-          if (mounted) _restartScan();
-        });
-      }
+      _failAndRescan("处理扫描结果时出错");
     }
+  }
+
+  void _failAndRescan(String message) {
+    if (!mounted) return;
+    Get.to(() => ChangkeSignResult(successful: false, message: message))
+        ?.then((_) => _restartScan());
   }
 
   // 重新开始扫描
   void _restartScan() {
-    if (mounted) {
-      setState(() {
-        isProcessing = false;
-      });
-      controller?.start();
-    }
-  }
-}
-
-// 扫描框组件（保持原有样式）
-class ScannerBox extends StatefulWidget {
-  final double width;
-  final double height;
-
-  const ScannerBox({Key? key, required this.width, required this.height})
-      : super(key: key);
-
-  @override
-  State<ScannerBox> createState() => _ScannerBoxState();
-}
-
-class _ScannerBoxState extends State<ScannerBox>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController =
-        AnimationController(vsync: this, duration: const Duration(seconds: 2))
-          ..repeat(reverse: true);
-    _animation = Tween<double>(begin: 0.0, end: widget.height)
-        .animate(_animationController);
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: widget.width,
-      height: widget.height,
-      child: AnimatedBuilder(
-        animation: _animation,
-        builder: (context, child) {
-          return CustomPaint(
-            painter: ScannerBoxPainter(_animation.value),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class ScannerBoxPainter extends CustomPainter {
-  final double position;
-  final double borderRadius;
-  final List<Color> gradientColors;
-
-  ScannerBoxPainter(this.position,
-      {this.borderRadius = 8.0,
-      this.gradientColors = const [Colors.blue, Colors.lightBlueAccent]});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gradient = LinearGradient(
-      colors: gradientColors,
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-    );
-
-    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
-    final rrect = RRect.fromRectAndRadius(rect, Radius.circular(borderRadius));
-
-    final borderPaint = Paint()
-      ..shader = gradient.createShader(rect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    canvas.drawRRect(rrect, borderPaint);
-
-    final linePaint = Paint()
-      ..shader = gradient.createShader(rect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    canvas.drawLine(
-        Offset(0, position), Offset(size.width, position), linePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    return true;
+    if (mounted) _scanController.resume();
   }
 }
 

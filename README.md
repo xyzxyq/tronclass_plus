@@ -13,7 +13,8 @@ TronClass Plus 是面向桂电同学的非官方 Tronclass 客户端，主打签
 
 ## 踩坑记录
 
-- **Release 模式的二维码扫描必须使用非 `Positioned` 的 overlay**：`MobileScanner.overlayBuilder` 若直接返回 `Positioned`（父节点不是 `Stack`），Debug 模式只发出警告，但 Release 会抛出 `type 'ParentData' is not a subtype of type 'StackParentData'` 并导致相机预览灰屏。现已改为 `Center` 包裹的自定义扫描框；调整 overlay 时务必保持这一约束。
+- **扫码用 [wxscan](https://github.com/wilinz/wxscan)（`wxscan_live`）**：CNN 检测 + 超分的 `wechat_qrcode` Rust 实现，小码、远码都能读。需要本机装有 rustup（首次构建时 build hook 自己编译 Rust 并拉 TFLite 库），CNN 权重放在 `assets/models/`（来自 [wxscan-weights](https://github.com/wilinz/wxscan-weights)），缺权重只是掉检测率，不会构建失败。
+- **macOS release 必须锁 arm64**：wxscan 目前只有 Apple Silicon 的 TFLite 库，默认的 universal 构建会在 build hook 里直接失败，已在 `macos/Runner/Configs/Release.xcconfig` 里写死 `ARCHS = arm64`。
 - **消息提示**：丰富的 Toast 成功/失败提示与本地化文案。
 
 ## 下载
@@ -31,6 +32,7 @@ TronClass Plus 是面向桂电同学的非官方 Tronclass 客户端，主打签
 - Flutter + GetX 状态管理
 - webview_flutter / flutter_map / geolocator / geocoding
 - encrypt + get_storage 密钥存储
+- wxscan_live 扫码（wechat_qrcode 的 Rust 实现）
 - dio, share_plus, permission_handler 等常用插件
 
 ## TODO
