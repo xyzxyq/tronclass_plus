@@ -36,6 +36,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // 只出 arm64。配合 gradle.properties 里的 disable-abi-filtering=true：
+        // 否则 Flutter gradle 插件会 clear 掉这里再塞回全部 ABI。
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     signingConfigs {
@@ -65,10 +72,6 @@ android {
 
     buildTypes {
         release {
-            ndk {
-                abiFilters.clear()
-                abiFilters.add("arm64-v8a")
-            }
             if (localProperties["storeFile"] != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
