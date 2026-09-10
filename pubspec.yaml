@@ -47,15 +47,10 @@ dependencies:
   dio: ^5.8.0+1
   dio_cookie_manager: ^3.1.1
   cookie_jar: ^4.0.8
-  # v0.26.1 的 fork，带 #819 的修复：iOS 冷启动时 PlatformView 的 frame 是 0×0，
-  # 这时做相机操作会在 0×0 视口上反投影 → NaN → mbgl::LatLng 抛 std::domain_error
-  # → SIGABRT。fork 把这些操作推迟到 frame 真正有尺寸之后。
-  # 上游 PR: maplibre/flutter-maplibre-gl#841
-  maplibre_gl:
-    git:
-      url: https://github.com/wilinz/flutter-maplibre-gl.git
-      ref: b3ba4827fa541c144eb7a32a41e10a094ee56a0e
-      path: maplibre_gl
+  # 0.26.2 起用官方版：iOS 冷启动 0×0 frame 导致 SIGABRT 的修复(#841)已经合进
+  # 上游。先不上 0.27.0——它在 AGP 9 + android.builtInKotlin=false 下会以
+  # "Could not find method kotlin()" 配置失败，修复还没发版(#1008)。
+  maplibre_gl: ^0.26.2
   geolocator: ^11.1.0
   geocoding: ^3.0.0
   device_info_plus: ^11.2.0
