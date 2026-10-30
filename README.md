@@ -8,6 +8,16 @@ TronClass Plus 是非官方的 Tronclass 客户端，主打签到、雷达点名
 
 最初是给桂电写的，现在**所有用畅课的学校都能用**：内置学校检索，选中后按该校自己的方式登录；桂电那条不用打开网页的账号密码直登通道仍然保留。
 
+## 界面展示
+
+以下为修改后 macOS 应用的实际运行截图。首页与选学校页面使用独立空白配置；扫码页仅展示本地图片入口，所有截图均不含个人账号信息。
+
+| 竖屏窗口与首页 | 添加账号先选择学校 | 图片与剪贴板扫码 |
+| :---: | :---: | :---: |
+| <img src="https://github.com/xyzxyq/tronclass_plus/releases/download/v1.7.0/macos-home.png" width="240" alt="macOS 竖屏窗口与未登录首页"> | <img src="https://github.com/xyzxyq/tronclass_plus/releases/download/v1.7.0/macos-school.png" width="240" alt="添加账号先选择学校"> | <img src="https://github.com/xyzxyq/tronclass_plus/releases/download/v1.7.0/macos-scan.png" width="240" alt="选择图片和 Command+V 粘贴扫码"> |
+
+截图可点击查看原图。静态图片展示窗口外观和操作入口；透明玻璃波纹、窗口拖动及网页悬停交互需要在应用内体验。
+
 ## 核心功能
 
 - **多学校支持**：搜学校 ➜ 选学校 ➜ 登录。接口地址、通知地址、身份认证配置都跟着选中的学校走，不再写死某一所。
